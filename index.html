@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Paadal – Tamil music player</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anek+Tamil:wdth,wght@75..125,300..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --peacock:#0F3B3F;   /* main surface */
+  --deep:#08262A;      /* side panels, bar */
+  --panel:#15474C;     /* raised surfaces */
+  --line:#1F5A60;      /* borders */
+  --rani:#E0457B;      /* action accent */
+  --zari:#D9A441;      /* gold accent */
+  --text:#F3E9D2;
+  --muted:#9DBDB7;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Anek Tamil',system-ui,sans-serif;background:var(--deep);color:var(--text);font-size:16px;line-height:1.45}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+button:disabled{opacity:.35;cursor:default}
+ul,ol{list-style:none}
+img{display:block}
+[hidden]{display:none!important}
+:focus-visible{outline:2px solid var(--zari);outline-offset:2px}
+.note{color:var(--muted);max-width:52ch}
+.small{font-size:14px}
+
+/* ---------- Layout ---------- */
+.app{display:grid;height:100vh;height:100dvh;
+  grid-template-columns:230px minmax(0,1fr) 340px;
+  grid-template-rows:minmax(0,1fr) auto;
+  grid-template-areas:"nav main side" "bar bar bar"}
+
+/* ---------- Sidebar ---------- */
+nav.side{grid-area:nav;border-right:1px solid var(--line);padding:24px 14px;overflow-y:auto;display:flex;flex-direction:column;gap:28px}
+.brand{font-weight:800;font-size:24px;font-variation-settings:"wdth" 125;color:var(--zari);padding:0 10px}
+.navlink{display:flex;gap:10px;align-items:center;width:100%;padding:8px 10px;border-radius:6px;color:var(--muted);text-align:left}
+.navlink svg{width:20px;height:20px;fill:currentColor;flex:none}
+.navlink:hover{color:var(--text)}
+.navlink[aria-current="true"]{color:var(--text);background:var(--panel)}
+.count{margin-left:auto;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.pl-section h2{font-size:14px;font-weight:600;color:var(--muted);padding:0 4px 0 10px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
+#pl-list .note{padding:4px 10px}
+.settings-link{margin-top:auto}
+
+/* ---------- Main ---------- */
+main{grid-area:main;overflow-y:auto;background:var(--peacock);padding:0 32px 48px}
+.searchbar{position:sticky;top:0;z-index:2;background:var(--peacock);padding:20px 0 16px;display:flex;gap:10px}
+.searchbar input{flex:1;min-width:0;background:var(--deep);border:1px solid var(--line);color:var(--text);padding:12px 18px;border-radius:999px;font:inherit}
+.searchbar input::placeholder{color:var(--muted)}
+.searchbar input:focus{outline:none;border-color:var(--zari)}
+.searchbtn{background:var(--rani);color:#fff;font-weight:600;padding:0 22px;border-radius:999px}
+
+.hero{padding:40px 0 24px}
+.hero h1{font-size:clamp(76px,13vw,172px);font-weight:800;line-height:1;color:var(--zari);font-variation-settings:"wdth" 125}
+.hero .lede{font-size:19px;color:var(--muted);max-width:44ch;margin-top:14px}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:28px;max-width:720px}
+.chip{border:1px solid var(--line);padding:7px 15px;border-radius:999px}
+.chip:hover{border-color:var(--zari);color:var(--zari)}
+.setup{margin-top:28px;padding:14px 16px;border-left:3px solid var(--rani);background:var(--deep)}
+.linkbtn{color:var(--zari);text-decoration:underline;text-underline-offset:3px}
+
+.view-title{font-size:30px;font-weight:700;font-variation-settings:"wdth" 112;margin:12px 0 20px;line-height:1.15}
+.pl-head{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px}
+.pl-tools{display:flex;gap:16px}
+.textbtn{color:var(--muted);font-size:15px}
+.textbtn:hover{color:var(--text)}
+.textbtn.primary{color:var(--zari);font-weight:600}
+.textbtn.danger[data-armed]{color:var(--rani);font-weight:600}
+
+/* Result grid */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:26px 18px}
+.card{position:relative}
+.card-play{display:block;width:100%;text-align:left}
+.thumb{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:6px;background:var(--deep)}
+.card .t,.row .t,.qitem .t{font-weight:600;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.card .t{margin-top:9px;font-size:15px}
+.c{display:block;color:var(--muted);font-size:13px}
+.card.playing .thumb{outline:2px solid var(--zari);outline-offset:3px}
+.card.playing .t{color:var(--zari)}
+.card-actions{position:absolute;top:6px;right:6px;display:flex;gap:4px;opacity:0}
+.card:hover .card-actions,.card:focus-within .card-actions{opacity:1}
+@media (hover:none){.card-actions{opacity:1}}
+
+.iconbtn{width:32px;height:32px;display:grid;place-items:center;border-radius:50%;background:rgba(8,38,42,.88);color:var(--text);flex:none}
+.iconbtn:hover{color:var(--zari)}
+.iconbtn svg{width:18px;height:18px;fill:currentColor}
+.iconbtn svg.outline{fill:none;stroke:currentColor;stroke-width:2}
+.iconbtn.liked{color:var(--rani)}
+.iconbtn.bare{background:none}
+
+/* Track rows */
+.row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px}
+.row:hover{background:rgba(243,233,210,.05)}
+.row-play{flex:1;min-width:0;display:grid;grid-template-columns:26px 72px minmax(0,1fr);gap:14px;align-items:center;text-align:left}
+.row .n{color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.row img{width:72px;aspect-ratio:16/9;object-fit:cover;border-radius:4px}
+.row.playing .t,.row.playing .n{color:var(--zari)}
+.row-actions{display:flex;gap:4px}
+.row-actions .iconbtn{background:none}
+
+/* ---------- Now playing panel ---------- */
+aside.now{grid-area:side;border-left:1px solid var(--line);padding:20px;overflow-y:auto}
+.video{width:100%;aspect-ratio:16/9;min-height:200px;background:#000;border-radius:6px;overflow:hidden}
+.video iframe{width:100%;height:100%;display:block}
+.now-title{font-size:20px;font-weight:700;line-height:1.25;margin-top:16px}
+.now-actions{display:flex;gap:6px;margin-top:10px}
+#now-info > .note{margin-top:16px}
+.upnext{margin-top:28px}
+.upnext h2{font-size:14px;font-weight:600;color:var(--muted);margin-bottom:8px}
+.qitem{display:grid;grid-template-columns:64px minmax(0,1fr);gap:12px;align-items:center;width:100%;text-align:left;padding:6px;border-radius:6px;font-size:14px}
+.qitem:hover{background:var(--panel)}
+.qitem img{width:64px;aspect-ratio:16/9;object-fit:cover;border-radius:4px}
+
+/* ---------- Player bar ---------- */
+.bar{grid-area:bar;position:relative;border-top:1px solid var(--line);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,2fr) minmax(0,1fr);gap:20px;align-items:center;padding:14px 20px}
+/* Kanchipuram-style zari border */
+.bar::before{content:"";position:absolute;left:0;right:0;top:-5px;height:4px;
+  background:repeating-linear-gradient(90deg,var(--zari) 0 12px,transparent 12px 16px,var(--rani) 16px 20px,transparent 20px 24px)}
+.bar-info{display:flex;align-items:center;gap:12px;min-width:0}
+.bar-info img{width:56px;height:56px;object-fit:cover;border-radius:4px}
+.bar-info .t{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bar-info > div{min-width:0}
+.bar-info .c{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.center{display:flex;flex-direction:column;align-items:center;gap:6px}
+.ctrls{display:flex;align-items:center;gap:18px}
+.ctrls svg{width:24px;height:24px;fill:currentColor}
+.playbtn{width:46px;height:46px;border-radius:50%;background:var(--rani);color:#fff;display:grid;place-items:center}
+.playbtn svg{width:26px;height:26px}
+.seek{display:flex;align-items:center;gap:10px;width:100%;max-width:560px;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.seek input{flex:1}
+input[type=range]{accent-color:var(--zari);cursor:pointer}
+.vol{display:flex;align-items:center;justify-content:flex-end;gap:8px;color:var(--muted)}
+.vol svg{width:20px;height:20px;fill:currentColor}
+.vol input{width:110px}
+
+/* ---------- Dialogs & toast ---------- */
+dialog{margin:auto;background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:24px;width:min(440px,92vw)}
+dialog::backdrop{background:rgba(4,20,22,.72)}
+dialog h2{font-size:22px;margin-bottom:8px;font-variation-settings:"wdth" 112}
+dialog p{color:var(--muted);font-size:15px;margin-bottom:14px}
+dialog a{color:var(--zari)}
+.field{width:100%;background:var(--deep);border:1px solid var(--line);color:var(--text);padding:10px 14px;border-radius:6px;font:inherit}
+.field:focus{outline:none;border-color:var(--zari)}
+.dlg-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:18px}
+.btn{padding:9px 18px;border-radius:999px;font-weight:600}
+.btn.primary{background:var(--rani);color:#fff}
+.btn.ghost{border:1px solid var(--line)}
+#add-list{max-height:240px;overflow-y:auto;margin-bottom:14px}
+.pick{width:100%;text-align:left;padding:10px 12px;border-radius:6px;display:flex;justify-content:space-between;gap:10px}
+.pick:hover{background:var(--deep)}
+.inline-new{display:flex;gap:8px}
+#toast{position:fixed;left:50%;bottom:112px;transform:translateX(-50%);background:var(--text);color:var(--deep);padding:10px 18px;border-radius:999px;font-weight:600;z-index:10;max-width:90vw;text-align:center}
+
+/* ---------- Mobile ---------- */
+@media (max-width:900px){
+  .app{grid-template-columns:1fr;grid-template-rows:auto auto minmax(0,1fr) auto;grid-template-areas:"nav" "side" "main" "bar"}
+  nav.side{flex-direction:row;align-items:center;gap:6px;padding:10px 12px;border-right:0;border-bottom:1px solid var(--line);overflow-x:auto;overflow-y:hidden}
+  .brand{font-size:20px;padding:0 8px 0 0}
+  .navgroup,.pl-section,#pl-list{display:contents}
+  .pl-section h2{order:5;padding:0;margin:0;font-size:0}
+  .navlink{width:auto;white-space:nowrap}
+  .navlink .label-extra,#pl-list .note{display:none}
+  .settings-link{margin-top:0}
+  aside.now{border-left:0;padding:10px 12px 0}
+  .video{height:200px;aspect-ratio:auto}
+  .now-title{font-size:16px;margin-top:8px}
+  .now-actions,.upnext{display:none}
+  main{padding:0 16px 24px}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:20px 12px}
+  .card .t{font-size:14px}
+  .hero{padding:16px 0}
+  .bar{grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"info ctrls" "seek seek";gap:8px 12px;padding:12px 14px}
+  .bar-info{grid-area:info}
+  .bar-info img{width:44px;height:44px}
+  .center{display:contents}
+  .ctrls{grid-area:ctrls;gap:12px}
+  .seek{grid-area:seek;max-width:none}
+  .vol{display:none}
+  #toast{bottom:130px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="side" aria-label="Library">
+    <div class="brand">Paadal</div>
+    <ul class="navgroup">
+      <li><button class="navlink" id="nav-home" data-act="home">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4a6 6 0 1 0 3.7 10.7l4.8 4.8 1.4-1.4-4.8-4.8A6 6 0 0 0 10 4zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8z"/></svg>Search</button></li>
+      <li><button class="navlink" id="nav-liked" data-act="liked">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>Liked songs<span class="count" id="liked-count"></span></button></li>
+    </ul>
+    <section class="pl-section">
+      <h2>Playlists <button class="iconbtn bare" data-act="new-pl" aria-label="New playlist" title="New playlist"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg></button></h2>
+      <ul id="pl-list"></ul>
+    </section>
+    <button class="navlink settings-link" data-act="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 14a5 5 0 1 1 4.9-6H22v4h-2v3h-3v-3h-5.1A5 5 0 0 1 7 14zm0-3a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" transform="translate(0 2)"/></svg>API key</button>
+  </nav>
+
+  <main>
+    <div class="searchbar">
+      <input id="q" type="search" placeholder="Search songs, movies or singers" aria-label="Search songs" autocomplete="off">
+      <button class="searchbtn" id="searchbtn">Search</button>
+    </div>
+    <div id="content"></div>
+  </main>
+
+  <aside class="now" aria-label="Now playing">
+    <div class="video"><div id="yt"></div></div>
+    <div id="now-info"></div>
+    <section class="upnext"><h2>Up next</h2><ol id="queue"></ol></section>
+  </aside>
+
+  <footer class="bar" aria-label="Player">
+    <div class="bar-info">
+      <img id="bar-thumb" alt="" hidden>
+      <div><div class="t" id="bar-title">Nothing playing</div><span class="c" id="bar-channel"></span></div>
+    </div>
+    <div class="center">
+      <div class="ctrls">
+        <button id="prevbtn" aria-label="Previous song" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"/></svg></button>
+        <button id="playbtn" class="playbtn" aria-label="Play"></button>
+        <button id="nextbtn" aria-label="Next song" title="Next"><svg viewBox="0 0 24 24"><path d="M16 6h2v12h-2zM6 18l8.5-6L6 6z"/></svg></button>
+      </div>
+      <div class="seek">
+        <span id="t-cur">0:00</span>
+        <input id="seek" type="range" min="0" max="0" step="1" value="0" aria-label="Song position">
+        <span id="t-dur">0:00</span>
+      </div>
+    </div>
+    <div class="vol">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 5V4L8 9H4zm12.5 3A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+      <input id="vol" type="range" min="0" max="100" value="80" aria-label="Volume">
+    </div>
+  </footer>
+</div>
+
+<!-- API key -->
+<dialog id="settings-dialog" aria-labelledby="settings-h">
+  <h2 id="settings-h">YouTube API key</h2>
+  <p id="settings-msg">Search needs a free YouTube Data API v3 key. Create one in the <a href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noopener">Google Cloud Console</a>, then paste it here.</p>
+  <input id="key-input" class="field" type="text" placeholder="AIza…" aria-label="API key" autocomplete="off" spellcheck="false">
+  <div class="dlg-actions">
+    <button class="btn ghost" data-close>Cancel</button>
+    <button class="btn primary" id="key-save">Save key</button>
+  </div>
+</dialog>
+
+<!-- Add to playlist -->
+<dialog id="add-dialog" aria-labelledby="add-h">
+  <h2 id="add-h">Add to playlist</h2>
+  <p id="add-song"></p>
+  <ul id="add-list"></ul>
+  <div class="inline-new">
+    <input id="add-name" class="field" type="text" placeholder="New playlist name" aria-label="New playlist name">
+    <button class="btn primary" id="add-create">Create</button>
+  </div>
+  <div class="dlg-actions"><button class="btn ghost" data-close>Close</button></div>
+</dialog>
+
+<!-- New / rename playlist -->
+<dialog id="name-dialog" aria-labelledby="name-h">
+  <h2 id="name-h">New playlist</h2>
+  <input id="name-input" class="field" type="text" placeholder="Playlist name" aria-label="Playlist name">
+  <div class="dlg-actions">
+    <button class="btn ghost" data-close>Cancel</button>
+    <button class="btn primary" id="name-save">Create playlist</button>
+  </div>
+</dialog>
+
+<div id="toast" role="status" hidden></div>
+
+<script>
+/* =========================================================
+   Paste your YouTube Data API v3 key here (or add it in the app).
+   ========================================================= */
+const CONFIG = { API_KEY: "" };
+
+const QUICK = ["Anirudh hits","A. R. Rahman melodies","Ilaiyaraaja classics","Yuvan Shankar Raja",
+               "Sid Sriram songs","Harris Jayaraj","G. V. Prakash Kumar","90s Tamil hits"];
+
+const ICON = {
+  play:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>',
+  heart:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>',
+  heartOutline:'<svg class="outline" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20l-1.2-1.1C6 14.6 3 11.9 3 8.5 3 6 5 4 7.5 4c1.5 0 3 .7 4.5 2.3C13.5 4.7 15 4 16.5 4 19 4 21 6 21 8.5c0 3.4-3 6.1-7.8 10.4L12 20z"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 5h2v14h-2zM5 11h14v2H5z"/></svg>',
+  close:'<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.4 5 12 10.6 17.6 5 19 6.4 13.4 12l5.6 5.6-1.4 1.4-5.6-5.6L6.4 19 5 17.6l5.6-5.6L5 6.4z"/></svg>'
+};
+
+const state = {
+  apiKey: CONFIG.API_KEY, liked: [], playlists: [],
+  view: { type: 'home' }, results: [], lastQuery: '', loading: false, error: '',
+  queue: [], index: -1, playing: false, volume: 80
+};
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const decoder = document.createElement('textarea');
+const decode = s => { decoder.innerHTML = s; return decoder.value; };
+const fmt = s => { s = Math.max(0, Math.floor(s || 0)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); };
+const uid = () => Math.random().toString(36).slice(2, 10);
+const current = () => state.queue[state.index] || null;
+const playingId = () => current()?.id;
+const isLiked = id => state.liked.some(t => t.id === id);
+const getPl = id => state.playlists.find(p => p.id === id);
+
+let toastTimer;
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.hidden = true, 2800);
+}
+
+/* ---------- storage (persists inside Claude; in-memory elsewhere) ---------- */
+async function loadData(){
+  if (!window.storage) return;
+  try {
+    const r = await window.storage.get('paadal-library', false);
+    if (r && r.value) {
+      const d = JSON.parse(r.value);
+      state.liked = d.liked || []; state.playlists = d.playlists || [];
+      if (!state.apiKey && d.apiKey) state.apiKey = d.apiKey;
+    }
+  } catch (e) { /* first run: nothing saved yet */ }
+}
+async function saveData(){
+  if (!window.storage) return;
+  try {
+    await window.storage.set('paadal-library',
+      JSON.stringify({ liked: state.liked, playlists: state.playlists, apiKey: state.apiKey }), false);
+  } catch (e) { console.error('Save failed', e); }
+}
+
+/* ---------- YouTube search ---------- */
+function toTrack(it){
+  const s = it.snippet, th = s.thumbnails || {};
+  return { id: it.id.videoId, title: decode(s.title), channel: decode(s.channelTitle),
+           thumb: (th.high || th.medium || th.default || {}).url || '' };
+}
+async function search(q){
+  q = (q || '').trim(); if (!q) return;
+  $('#q').value = q;
+  if (!state.apiKey) { openSettings('Add your YouTube API key first, then search again.'); return; }
+  state.view = { type: 'search' }; state.lastQuery = q; state.loading = true; state.error = ''; state.results = [];
+  renderNav(); renderMain();
+  try {
+    const p = new URLSearchParams({ part:'snippet', type:'video', videoEmbeddable:'true', videoCategoryId:'10',
+      maxResults:'24', regionCode:'IN', relevanceLanguage:'ta', q, key: state.apiKey });
+    const res = await fetch('https://www.googleapis.com/youtube/v3/search?' + p);
+    const data = await res.json();
+    if (!res.ok) {
+      const reason = data?.error?.errors?.[0]?.reason || '', msg = data?.error?.message || '';
+      if (reason === 'quotaExceeded') throw new Error("Today's YouTube search limit is used up. It resets at midnight Pacific time.");
+      if (/api key/i.test(msg) || reason === 'keyInvalid') throw new Error('YouTube rejected this API key. Check it under API key in the sidebar.');
+      throw new Error(msg || 'Search failed with status ' + res.status + '.');
+    }
+    state.results = (data.items || []).filter(it => it.id?.videoId).map(toTrack);
+  } catch (e) {
+    state.error = e instanceof TypeError ? 'Could not reach YouTube. Check your internet connection.' : e.message;
+  }
+  state.loading = false; renderMain();
+}
+
+/* ---------- YouTube player ---------- */
+let player = null, playerReady = false, pendingId = null, seeking = false;
+window.onYouTubeIframeAPIReady = function(){
+  const vars = { playsinline: 1, rel: 0 };
+  if (location.protocol.startsWith('http')) vars.origin = location.origin;
+  player = new YT.Player('yt', {
+    width: '100%', height: '100%', playerVars: vars,
+    events: {
+      onReady: () => { playerReady = true; player.setVolume(state.volume); if (pendingId) { player.loadVideoById(pendingId); pendingId = null; } },
+      onStateChange: e => {
+        if (e.data === YT.PlayerState.PLAYING) state.playing = true;
+        else if (e.data === YT.PlayerState.PAUSED) state.playing = false;
+        else if (e.data === YT.PlayerState.ENDED) { state.playing = false; next(); return; }
+        renderBar();
+      },
+      onError: e => {
+        const blocked = [100, 101, 150].includes(e.data);
+        toast(blocked ? "This song can't play outside YouTube. Skipping to the next one." : 'This song failed to load. Skipping.');
+        next();
+      }
+    }
+  });
+};
+
+function playList(list, i){ state.queue = list.slice(); state.index = i; startCurrent(); }
+function startCurrent(){
+  const t = current(); if (!t) return;
+  if (playerReady) player.loadVideoById(t.id); else pendingId = t.id;
+  renderAll();
+}
+function next(){
+  if (state.index < state.queue.length - 1) { state.index++; startCurrent(); }
+  else { state.playing = false; renderBar(); }
+}
+function prev(){
+  if (playerReady && player.getCurrentTime() > 3) { player.seekTo(0, true); return; }
+  if (state.index > 0) { state.index--; startCurrent(); }
+}
+function toggle(){
+  if (!current()) { const list = viewTracks(); if (list.length) playList(list, 0); return; }
+  if (!playerReady) return;
+  state.playing ? player.pauseVideo() : player.playVideo();
+}
+
+setInterval(() => {
+  if (!playerReady || !current() || seeking || !player.getDuration) return;
+  const d = player.getDuration() || 0, c = player.getCurrentTime() || 0;
+  const s = $('#seek'); s.max = Math.floor(d); s.value = Math.floor(c);
+  $('#t-cur').textContent = fmt(c); $('#t-dur').textContent = fmt(d);
+}, 500);
+
+/* ---------- library actions ---------- */
+function toggleLike(t){
+  const had = isLiked(t.id);
+  state.liked = had ? state.liked.filter(x => x.id !== t.id) : [t, ...state.liked];
+  saveData(); renderAll(); toast(had ? 'Removed from Liked songs' : 'Added to Liked songs');
+}
+function createPlaylist(name){
+  const p = { id: uid(), name, tracks: [] }; state.playlists.push(p); saveData(); return p;
+}
+function addTo(p, t){
+  if (p.tracks.some(x => x.id === t.id)) toast('Already in ' + p.name);
+  else { p.tracks.push(t); saveData(); toast('Added to ' + p.name); }
+  $('#add-dialog').close(); renderAll();
+}
+function viewTracks(){
+  const v = state.view;
+  if (v.type === 'search') return state.results;
+  if (v.type === 'liked') return state.liked;
+  if (v.type === 'playlist') return getPl(v.id)?.tracks || [];
+  return [];
+}
+
+/* ---------- dialogs ---------- */
+let pendingAdd = null, nameMode = 'create';
+function openSettings(msg){
+  if (msg) $('#settings-msg').firstChild.textContent = msg + ' ';
+  $('#key-input').value = state.apiKey; $('#settings-dialog').showModal(); $('#key-input').focus();
+}
+function openAdd(t){
+  pendingAdd = t;
+  $('#add-song').textContent = t.title;
+  $('#add-list').innerHTML = state.playlists.map(p =>
+    `<li><button class="pick" data-pl="${p.id}"><span>${esc(p.name)}</span><span class="c">${p.tracks.length} songs</span></button></li>`
+  ).join('') || '<li class="note small">No playlists yet. Name one below.</li>';
+  $('#add-name').value = ''; $('#add-dialog').showModal();
+}
+function openName(mode){
+  nameMode = mode;
+  const p = mode === 'rename' ? getPl(state.view.id) : null;
+  $('#name-h').textContent = p ? 'Rename playlist' : 'New playlist';
+  $('#name-save').textContent = p ? 'Save name' : 'Create playlist';
+  $('#name-input').value = p ? p.name : '';
+  $('#name-dialog').showModal(); $('#name-input').focus();
+}
+
+/* ---------- rendering ---------- */
+function likeBtn(t, act, i){
+  const l = isLiked(t.id);
+  return `<button class="iconbtn${l ? ' liked' : ''}" data-act="${act}" data-i="${i}" aria-pressed="${l}"
+    aria-label="${l ? 'Remove from' : 'Add to'} Liked songs" title="${l ? 'Unlike' : 'Like'}">${l ? ICON.heart : ICON.heartOutline}</button>`;
+}
+function addBtn(act, i){
+  return `<button class="iconbtn" data-act="${act}" data-i="${i}" aria-label="Add to playlist" title="Add to playlist">${ICON.plus}</button>`;
+}
+function cardHTML(t, i){
+  return `<div class="card${playingId() === t.id ? ' playing' : ''}">
+    <button class="card-play" data-act="play" data-i="${i}">
+      <img class="thumb" src="${esc(t.thumb)}" alt="" loading="lazy">
+      <span class="t">${esc(t.title)}</span><span class="c">${esc(t.channel)}</span>
+    </button>
+    <div class="card-actions">${likeBtn(t, 'like', i)}${addBtn('add', i)}</div>
+  </div>`;
+}
+function rowsHTML(list, removable){
+  return `<ol class="rows">${list.map((t, i) => `
+    <li class="row${playingId() === t.id ? ' playing' : ''}">
+      <button class="row-play" data-act="play" data-i="${i}">
+        <span class="n">${i + 1}</span><img src="${esc(t.thumb)}" alt="" loading="lazy">
+        <span><span class="t">${esc(t.title)}</span><span class="c">${esc(t.channel)}</span></span>
+      </button>
+      <span class="row-actions">${likeBtn(t, 'like', i)}${removable
+        ? `<button class="iconbtn" data-act="remove" data-i="${i}" aria-label="Remove from playlist" title="Remove">${ICON.close}</button>`
+        : addBtn('add', i)}</span>
+    </li>`).join('')}</ol>`;
+}
+function heroHTML(){
+  const fileNote = location.protocol === 'file:'
+    ? `<p class="note setup">You opened this file directly, so YouTube may refuse to play songs. Run it from a local server instead (for example <code>npx serve</code> in this folder, or the Live Server extension in VS Code).</p>` : '';
+  const keyNote = state.apiKey ? '' :
+    `<p class="note setup">To start, <button class="linkbtn" data-act="settings">add your YouTube API key</button>.</p>`;
+  return `<section class="hero">
+    <h1 lang="ta">பாடல்</h1>
+    <p class="lede">Search Tamil songs by movie, singer or music director. Every song plays from its official YouTube upload.</p>
+    <div class="chips">${QUICK.map(q => `<button class="chip" data-act="quick" data-q="${esc(q)}">${esc(q)}</button>`).join('')}</div>
+    ${keyNote}${fileNote}
+  </section>`;
+}
+function renderMain(){
+  const v = state.view, el = $('#content');
+  if (v.type === 'home') { el.innerHTML = heroHTML(); return; }
+  if (v.type === 'search') {
+    const q = esc(state.lastQuery);
+    if (state.loading) el.innerHTML = `<h1 class="view-title">Searching for “${q}”</h1><p class="note">Finding songs…</p>`;
+    else if (state.error) el.innerHTML = `<h1 class="view-title">Search didn't work</h1><p class="note">${esc(state.error)}</p>`;
+    else if (!state.results.length) el.innerHTML = `<h1 class="view-title">No songs found for “${q}”</h1><p class="note">Try the movie name, the singer or the music director.</p>`;
+    else el.innerHTML = `<h1 class="view-title">Songs for “${q}”</h1><div class="grid">${state.results.map(cardHTML).join('')}</div>`;
+    return;
+  }
+  if (v.type === 'liked') {
+    el.innerHTML = `<div class="pl-head"><h1 class="view-title">Liked songs</h1>
+      ${state.liked.length ? '<div class="pl-tools"><button class="textbtn primary" data-act="play-all">Play all</button></div>' : ''}</div>`
+      + (state.liked.length ? rowsHTML(state.liked, false) : '<p class="note">Tap the heart on any song to save it here.</p>');
+    return;
+  }
+  if (v.type === 'playlist') {
+    const p = getPl(v.id);
+    if (!p) { state.view = { type: 'home' }; renderMain(); return; }
+    el.innerHTML = `<div class="pl-head"><h1 class="view-title">${esc(p.name)}</h1>
+      <div class="pl-tools">${p.tracks.length ? '<button class="textbtn primary" data-act="play-all">Play all</button>' : ''}
+        <button class="textbtn" data-act="rename-pl">Rename</button>
+        <button class="textbtn danger" data-act="delete-pl">Delete playlist</button></div></div>`
+      + (p.tracks.length ? rowsHTML(p.tracks, true) : '<p class="note">Search for a song and use the plus button to add it here.</p>');
+  }
+}
+function renderNav(){
+  const v = state.view;
+  $('#nav-home').setAttribute('aria-current', v.type === 'home' || v.type === 'search');
+  $('#nav-liked').setAttribute('aria-current', v.type === 'liked');
+  $('#liked-count').textContent = state.liked.length || '';
+  $('#pl-list').innerHTML = state.playlists.map(p =>
+    `<li><button class="navlink" data-act="open-pl" data-id="${p.id}" aria-current="${v.type === 'playlist' && v.id === p.id}">
+      ${esc(p.name)}<span class="count">${p.tracks.length || ''}</span></button></li>`
+  ).join('') || '<li class="note small">No playlists yet</li>';
+}
+function renderSide(){
+  const t = current();
+  $('#now-info').innerHTML = t
+    ? `<h2 class="now-title">${esc(t.title)}</h2><span class="c">${esc(t.channel)}</span>
+       <div class="now-actions">${likeBtn(t, 'like-current', 0)}${addBtn('add-current', 0)}</div>`
+    : '<p class="note">Pick a song to start listening. The video plays here.</p>';
+  const up = state.queue.slice(state.index + 1);
+  $('#queue').innerHTML = up.length
+    ? up.map((q, k) => `<li><button class="qitem" data-act="jump" data-i="${state.index + 1 + k}">
+        <img src="${esc(q.thumb)}" alt="" loading="lazy"><span><span class="t">${esc(q.title)}</span><span class="c">${esc(q.channel)}</span></span></button></li>`).join('')
+    : '<li class="note small">Songs from the list you play will line up here.</li>';
+}
+function renderBar(){
+  const t = current(), img = $('#bar-thumb');
+  if (t) { img.src = t.thumb; img.hidden = false; } else { img.removeAttribute('src'); img.hidden = true; }
+  $('#bar-title').textContent = t ? t.title : 'Nothing playing';
+  $('#bar-channel').textContent = t ? t.channel : '';
+  $('#playbtn').innerHTML = state.playing ? ICON.pause : ICON.play;
+  $('#playbtn').setAttribute('aria-label', state.playing ? 'Pause' : 'Play');
+  $('#prevbtn').disabled = !t;
+  $('#nextbtn').disabled = !t || state.index >= state.queue.length - 1;
+}
+function renderAll(){ renderNav(); renderMain(); renderSide(); renderBar(); }
+
+/* ---------- events ---------- */
+document.addEventListener('click', e => {
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act, i = +b.dataset.i;
+  const list = viewTracks();
+  switch (act) {
+    case 'home': state.view = { type: state.results.length || state.error ? 'search' : 'home' }; renderAll(); $('#q').focus(); break;
+    case 'liked': state.view = { type: 'liked' }; renderAll(); break;
+    case 'open-pl': state.view = { type: 'playlist', id: b.dataset.id }; renderAll(); break;
+    case 'quick': search(b.dataset.q); break;
+    case 'settings': openSettings(); break;
+    case 'play': playList(list, i); break;
+    case 'play-all': if (list.length) playList(list, 0); break;
+    case 'like': if (list[i]) toggleLike(list[i]); break;
+    case 'add': if (list[i]) openAdd(list[i]); break;
+    case 'like-current': if (current()) toggleLike(current()); break;
+    case 'add-current': if (current()) openAdd(current()); break;
+    case 'jump': state.index = i; startCurrent(); break;
+    case 'new-pl': openName('create'); break;
+    case 'rename-pl': openName('rename'); break;
+    case 'remove': {
+      const p = getPl(state.view.id);
+      if (p) { const [gone] = p.tracks.splice(i, 1); saveData(); renderAll(); toast('Removed ' + gone.title); }
+      break;
+    }
+    case 'delete-pl': {
+      if (!b.dataset.armed) {
+        b.dataset.armed = '1'; b.textContent = 'Tap again to delete';
+        setTimeout(() => { if (b.isConnected) { delete b.dataset.armed; b.textContent = 'Delete playlist'; } }, 3000);
+        return;
+      }
+      const p = getPl(state.view.id);
+      state.playlists = state.playlists.filter(x => x.id !== state.view.id);
+      state.view = { type: 'home' }; saveData(); renderAll(); if (p) toast('Deleted ' + p.name);
+      break;
+    }
+  }
+});
+
+$('#searchbtn').addEventListener('click', () => search($('#q').value));
+$('#q').addEventListener('keydown', e => { if (e.key === 'Enter') search($('#q').value); });
+$('#playbtn').addEventListener('click', toggle);
+$('#nextbtn').addEventListener('click', next);
+$('#prevbtn').addEventListener('click', prev);
+$('#seek').addEventListener('input', e => { seeking = true; $('#t-cur').textContent = fmt(+e.target.value); });
+$('#seek').addEventListener('change', e => { if (playerReady) player.seekTo(+e.target.value, true); seeking = false; });
+$('#vol').addEventListener('input', e => { state.volume = +e.target.value; if (playerReady) player.setVolume(state.volume); });
+
+document.querySelectorAll('dialog [data-close]').forEach(b => b.addEventListener('click', () => b.closest('dialog').close()));
+
+$('#key-save').addEventListener('click', () => {
+  state.apiKey = $('#key-input').value.trim(); saveData(); $('#settings-dialog').close();
+  renderMain(); toast(state.apiKey ? 'API key saved' : 'API key removed');
+  if (state.apiKey && $('#q').value.trim() && state.view.type === 'home') search($('#q').value);
+});
+$('#key-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('#key-save').click(); });
+
+$('#add-list').addEventListener('click', e => {
+  const b = e.target.closest('[data-pl]'); if (!b || !pendingAdd) return;
+  const p = getPl(b.dataset.pl); if (p) addTo(p, pendingAdd);
+});
+$('#add-create').addEventListener('click', () => {
+  const name = $('#add-name').value.trim(); if (!name || !pendingAdd) return;
+  addTo(createPlaylist(name), pendingAdd);
+});
+$('#add-name').addEventListener('keydown', e => { if (e.key === 'Enter') $('#add-create').click(); });
+
+$('#name-save').addEventListener('click', () => {
+  const name = $('#name-input').value.trim(); if (!name) return;
+  if (nameMode === 'rename') { const p = getPl(state.view.id); if (p) p.name = name; saveData(); }
+  else { const p = createPlaylist(name); state.view = { type: 'playlist', id: p.id }; }
+  $('#name-dialog').close(); renderAll();
+});
+$('#name-input').addEventListener('keydown', e => { if (e.key === 'Enter') $('#name-save').click(); });
+
+document.addEventListener('keydown', e => {
+  if (e.code !== 'Space') return;
+  if (e.target.closest('input, textarea, button, dialog')) return;
+  e.preventDefault(); toggle();
+});
+
+/* ---------- start ---------- */
+(async function init(){
+  await loadData();
+  renderAll();
+  const s = document.createElement('script');
+  s.src = 'https://www.youtube.com/iframe_api';
+  document.head.appendChild(s);
+})();
+</script>
+</body>
+</html>
